@@ -91,6 +91,22 @@ fun SaveManagerScreen(
         }
     }
 
+    fun prepareNativeExport(filename: String) {
+        if (!hasImportedNativeSave) {
+            viewModel.showMessage("Najpierw otwórz oryginalny zapis .sv/.hsv. JSON nie zawiera archiwum MPQ.")
+            return
+        }
+        runCatching {
+            val bytes = viewModel.exportSaveMpqBytes(context.filesDir)
+            check(bytes.isNotEmpty()) { "Generated MPQ save is empty." }
+            pendingMpqBytes = bytes
+            createSaveLauncher.launch(filename)
+        }.onFailure {
+            pendingMpqBytes = null
+            viewModel.showMessage("Nie można przygotować zapisu: ${it.message}")
+        }
+    }
+
     val createJsonLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -242,23 +258,7 @@ fun SaveManagerScreen(
                     }
 
                     FilledTonalButton(
-                        onClick = {
-                            if (!hasImportedNativeSave) {
-                                viewModel.showMessage(
-                                    "Najpierw otwórz oryginalny zapis .sv/.hsv. JSON nie zawiera archiwum MPQ potrzebnego do eksportu."
-                                )
-                            } else {
-                                runCatching {
-                                    val bytes = viewModel.exportSaveMpqBytes()
-                                    check(bytes.isNotEmpty()) { "Generated MPQ save is empty." }
-                                    pendingMpqBytes = bytes
-                                    createSaveLauncher.launch(defaultSaveFilename)
-                                }.onFailure {
-                                    pendingMpqBytes = null
-                                    viewModel.showMessage("Nie można przygotować zapisu: ${it.message}")
-                                }
-                            }
-                        },
+                        onClick = { prepareNativeExport(defaultSaveFilename) },
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = BloodRedDark,
                             contentColor = Color.White
@@ -286,8 +286,9 @@ fun SaveManagerScreen(
                 ) {
                     OutlinedButton(
                         onClick = {
+                            viewModel.setGameMod(GameMod.VANILLA_DIABLO)
                             viewModel.setIsMultiplayer(true)
-                            createSaveLauncher.launch("multi_0.sv")
+                            prepareNativeExport("multi_0.sv")
                         },
                         border = BorderStroke(1.dp, BloodRedDark),
                         modifier = Modifier.weight(1f)
@@ -297,9 +298,9 @@ fun SaveManagerScreen(
 
                     OutlinedButton(
                         onClick = {
-                            viewModel.setIsMultiplayer(true)
                             viewModel.setGameMod(GameMod.HELLFIRE)
-                            createSaveLauncher.launch("multi_0.hsv")
+                            viewModel.setIsMultiplayer(true)
+                            prepareNativeExport("multi_0.hsv")
                         },
                         border = BorderStroke(1.dp, BloodRedDark),
                         modifier = Modifier.weight(1f)
@@ -367,9 +368,12 @@ fun SaveManagerScreen(
 
                     FilledTonalButton(
                         onClick = {
-                            val testBytes = viewModel.exportSaveMpqBytes()
-                            viewModel.inspectBytes(testBytes)
-                            viewModel.showMessage("Przeanalizowano kontener MPQ DevilutionX")
+                            runCatching {
+                                viewModel.inspectImportedSave()
+                                viewModel.showMessage("Przeanalizowano oryginalny kontener MPQ")
+                            }.onFailure {
+                                viewModel.showMessage("Nie można przeanalizować zapisu: ${it.message}")
+                            }
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         modifier = Modifier.defaultMinSize(minHeight = 28.dp)

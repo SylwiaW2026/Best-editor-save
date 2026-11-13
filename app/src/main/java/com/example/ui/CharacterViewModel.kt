@@ -588,6 +588,13 @@ class CharacterViewModel : ViewModel() {
         )
     }
 
+    fun inspectImportedSave() {
+        val original = importedOriginalSave
+            ?: throw IllegalStateException("Najpierw otwórz oryginalny plik .sv/.hsv.")
+        require(original.isNotEmpty()) { "Otwarty plik zapisu jest pusty." }
+        inspectBytes(original)
+    }
+
     fun inspectBytes(bytes: ByteArray) {
         val mpq = MpqTool.analyzeMpqHeader(bytes)
         _mpqInfo.value = mpq
