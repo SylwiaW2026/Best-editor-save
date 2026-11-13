@@ -35,6 +35,8 @@ class CharacterViewModel : ViewModel() {
     private var importedOriginalSave: ByteArray? = null
     private var importedRawHero: ByteArray? = null
     private var lastNativeReadError: String? = null
+    private val _hasImportedNativeSave = MutableStateFlow(false)
+    val hasImportedNativeSave: StateFlow<Boolean> = _hasImportedNativeSave.asStateFlow()
     val character: StateFlow<HeroCharacter> = _character.asStateFlow()
 
     private val _activeTab = MutableStateFlow(EditorTab.HERO)
@@ -379,6 +381,10 @@ class CharacterViewModel : ViewModel() {
     fun importNoctonicJson(jsonStr: String): Boolean {
         return try {
             val loaded = NoctonicJsonParser.fromJson(jsonStr)
+            // JSON is character data, not the original MPQ container needed for a safe .sv/.hsv round-trip.
+            importedOriginalSave = null
+            importedRawHero = null
+            _hasImportedNativeSave.value = false
             _character.value = loaded
             showMessage("Successfully imported character: ${loaded.name} (Lv ${loaded.level} ${loaded.heroClass.displayName})")
             true
@@ -395,8 +401,12 @@ class CharacterViewModel : ViewModel() {
     
     fun importSaveBytes(bytes: ByteArray, filename: String): Boolean {
         Log.d("D1SaveBridge", "Importing save: $filename, size: ${bytes.size}")
+        importedOriginalSave = null
+        importedRawHero = null
+        _hasImportedNativeSave.value = false
         var stagedArchive: File? = null
         return try {
+            require(bytes.isNotEmpty()) { "Selected save file is empty (0 bytes)." }
             val lower = filename.lowercase()
             val extension = if (lower.endsWith(".${SaveConstants.HELLFIRE_EXTENSION}")) SaveConstants.HELLFIRE_EXTENSION else SaveConstants.STANDARD_EXTENSION
 
@@ -423,6 +433,7 @@ class CharacterViewModel : ViewModel() {
             if (rawHero != null && rawHero.isNotEmpty()) {
                 importedOriginalSave = bytes.copyOf()
                 importedRawHero = rawHero.copyOf()
+                _hasImportedNativeSave.value = true
                 val parsedHero = parseNativePlayerPack(rawHero).copy(
                     isMultiplayer = isMultiplayer,
                     gameMod = if (isHellfire) GameMod.HELLFIRE else _character.value.gameMod

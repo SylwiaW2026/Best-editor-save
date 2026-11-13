@@ -73,7 +73,12 @@ class SaveFileService {
                 false,
                 hero.gameMod == com.example.data.model.GameMod.HELLFIRE,
             )
-            return stagedArchive.readBytes()
+            check(stagedArchive.isFile && stagedArchive.length() > 0L) {
+                "Native MPQ writer produced an empty archive."
+            }
+            return stagedArchive.readBytes().also { result ->
+                check(result.isNotEmpty()) { "Native MPQ export returned 0 bytes." }
+            }
         } finally {
             stagedArchive.delete()
         }
