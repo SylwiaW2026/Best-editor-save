@@ -1,50 +1,18 @@
 package com.example.data.service
 
 import com.example.data.model.HeroCharacter
-import com.example.data.model.DiabloItem
-import com.example.data.model.EquipSlot
 import com.example.data.parser.MpqHeaderInfo
 import com.example.data.parser.MpqTool
 import com.example.data.parser.NativeSaveBridge
 import com.example.data.parser.SaveConstants
 import java.io.File
 import java.util.UUID
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /**
  * Service for handling DevilutionX save file I/O operations.
  * Acts as a clean interface between the ViewModel and parsing utilities.
  */
 class SaveFileService {
-
-    /**
-     * Serializes a list of DiabloItems into a ByteArray of fixed-size ItemPack structs.
-     */
-    private fun serializeItems(items: List<DiabloItem?>, maxItems: Int): ByteArray {
-        val itemSize = 19 // Struct is 19 bytes
-        val buffer = ByteBuffer.allocate(maxItems * itemSize).order(ByteOrder.LITTLE_ENDIAN)
-
-        for (i in 0 until maxItems) {
-            val item = items.getOrNull(i)
-            if (item == null) {
-                buffer.putInt(0) // iSeed = 0
-                buffer.position(buffer.position() + itemSize - 4)
-            } else {
-                buffer.putInt(item.iSeed)
-                buffer.putShort(0) // iCreateInfo
-                buffer.putShort(item.itemIndex.toShort())
-                buffer.put(0) // bId
-                buffer.put(item.durability.toByte())
-                buffer.put(item.maxDurability.toByte())
-                buffer.put(0) // bCh
-                buffer.put(0) // bMCh
-                buffer.putShort(0) // wValue
-                buffer.putInt(0) // dwBuff
-            }
-        }
-        return buffer.array()
-    }
 
     /**
      * Uses the native PlayerPack writer on a staged copy of the imported MPQ.
@@ -94,16 +62,9 @@ class SaveFileService {
             patch("maxHpBase", hero.maxLife.toLong() * SaveConstants.HP_MANA_SCALE_FACTOR)
             patch("manaBase", hero.baseMana.toLong() * SaveConstants.HP_MANA_SCALE_FACTOR)
             patch("maxManaBase", hero.maxMana.toLong() * SaveConstants.HP_MANA_SCALE_FACTOR)
-            
-            // Inventory patches
-            val invBodyItems = arrayOfNulls<DiabloItem>(7)
-            EquipSlot.entries.forEachIndexed { index, slot -> 
-                invBodyItems[index] = hero.equipment[slot] 
-            }
-            patch("invBody", serializeItems(invBodyItems.toList(), 7))
-            
-            val invListItems = hero.inventory.take(40)
-            patch("invList", serializeItems(invListItems, 40))
+
+            // Do not rewrite ItemPack arrays yet: the UI model cannot round-trip all
+            // native/mod-specific fields. Preserve original inventory bytes unchanged.
 
             NativeSaveBridge.writeHero(
                 stagedArchive.absolutePath,

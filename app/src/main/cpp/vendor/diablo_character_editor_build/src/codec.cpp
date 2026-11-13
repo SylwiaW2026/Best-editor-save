@@ -100,41 +100,40 @@ void XorBlock(const uint32_t *shaResult, uint32_t *out)
 
 std::size_t codec_decode(std::byte *pbSrcDst, std::size_t size, const char *pszPassword)
 {
-	uint32_t buf[BlockSize];
-	uint32_t dst[SHA1HashSize];
+    if (pbSrcDst == nullptr || pszPassword == nullptr || size <= SignatureSize)
+        return 0;
+    const std::size_t encryptedSize = size - SignatureSize;
+    if (encryptedSize == 0 || encryptedSize % BlockSizeBytes != 0)
+        return 0;
 
-	SHA1Context context = CodecInitKey(pszPassword);
-	if (size <= SignatureSize)
-		return 0;
-	size -= SignatureSize;
-	if (size % BlockSize != 0)
-		return 0;
-	for (size_t i = 0; i < size; pbSrcDst += BlockSizeBytes, i += BlockSizeBytes) {
-		memcpy(buf, pbSrcDst, BlockSizeBytes);
-		ByteSwapBlock(buf);
-		SHA1Result(context, dst);
-		XorBlock(dst, buf);
-		SHA1Calculate(context, buf);
-		ByteSwapBlock(buf);
-		memcpy(pbSrcDst, buf, BlockSizeBytes);
-	}
+    uint32_t buf[BlockSize];
+    uint32_t dst[SHA1HashSize];
+    SHA1Context context = CodecInitKey(pszPassword);
+    for (size_t i = 0; i < encryptedSize; i += BlockSizeBytes) {
+        std::memcpy(buf, pbSrcDst + i, BlockSizeBytes);
+        ByteSwapBlock(buf);
+        SHA1Result(context, dst);
+        XorBlock(dst, buf);
+        SHA1Calculate(context, buf);
+        ByteSwapBlock(buf);
+        std::memcpy(pbSrcDst + i, buf, BlockSizeBytes);
+    }
 
-	memset(buf, 0, sizeof(buf));
-	const CodecSignature sig = GetCodecSignature(pbSrcDst);
-	if (sig.error > 0) {
-		return 0;
-	}
-
-	SHA1Result(context, dst);
-	if (sig.checksum != dst[0]) {
-                std::cerr << "Checksum mismatch signature=" << sig.checksum
-                          << " vs calculated=" << dst[0] << "\n";
-                memset(dst, 0, sizeof(dst));
-                return 0;
-        }
-
-	size += sig.lastChunkSize - BlockSizeBytes;
-	return size;
+    std::memset(buf, 0, sizeof(buf));
+    const CodecSignature sig = GetCodecSignature(pbSrcDst + encryptedSize);
+    if (sig.error != 0 || sig.lastChunkSize == 0 || sig.lastChunkSize > BlockSizeBytes) {
+        std::memset(dst, 0, sizeof(dst));
+        return 0;
+    }
+    SHA1Result(context, dst);
+    if (sig.checksum != dst[0]) {
+        std::memset(dst, 0, sizeof(dst));
+        return 0;
+    }
+    const std::size_t decodedSize =
+        encryptedSize - (BlockSizeBytes - static_cast<std::size_t>(sig.lastChunkSize));
+    std::memset(dst, 0, sizeof(dst));
+    return decodedSize;
 }
 
 std::size_t codec_get_encoded_len(std::size_t dwSrcBytes)
@@ -150,6 +149,8 @@ void codec_encode(std::byte *pbSrcDst, std::size_t size, std::size_t size64, con
 	uint32_t tmp[SHA1HashSize];
 	uint32_t dst[SHA1HashSize];
 
+        if (pbSrcDst == nullptr || pszPassword == nullptr || size == 0)
+                throw std::invalid_argument("Invalid encode input.");
         if (size64 != codec_get_encoded_len(size))
                 throw std::runtime_error("Invalid encode parameters");
 	SHA1Context context = CodecInitKey(pszPassword);

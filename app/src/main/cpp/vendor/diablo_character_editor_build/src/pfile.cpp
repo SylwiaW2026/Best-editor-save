@@ -27,20 +27,34 @@ const char *pfile_get_password()
     else
         pwd = gbIsMultiplayer ? PASSWORD_MULTI : PASSWORD_SINGLE;
     
-    __android_log_print(ANDROID_LOG_INFO, "D1SaveBridge", "Using password: %s (Multi: %d, Spawn: %d)", pwd, gbIsMultiplayer, gbIsSpawn);
+    __android_log_print(ANDROID_LOG_INFO, "D1SaveBridge", "Selected password profile (Multi: %d, Spawn: %d)", gbIsMultiplayer, gbIsSpawn);
     return pwd;
 }
 
 std::unique_ptr<std::byte[]> ReadArchive(MpqArchive &archive, const char *pszName, size_t *pdwLen)
 {
-    int32_t error;
+    if (pdwLen == nullptr || pszName == nullptr) return nullptr;
+    *pdwLen = 0;
+    if (!archive.HasFile(pszName)) {
+        __android_log_print(ANDROID_LOG_ERROR, "D1SaveBridge", "MPQ entry '%s' was not found", pszName);
+        return nullptr;
+    }
+    int32_t error = 0;
     auto data = archive.ReadFile(pszName, *pdwLen, error);
-    if (!data)
+    if (!data || *pdwLen == 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "D1SaveBridge", "MPQ entry '%s' read failed (error=%d)", pszName, error);
+        *pdwLen = 0;
         return nullptr;
-    const std::size_t decoded = codec_decode(data.get(), *pdwLen, pfile_get_password());
-    if (decoded == 0)
+    }
+    const std::size_t encodedSize = *pdwLen;
+    const std::size_t decodedSize = codec_decode(data.get(), encodedSize, pfile_get_password());
+    if (decodedSize == 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "D1SaveBridge", "MPQ entry '%s' failed codec validation (encoded=%zu)", pszName, encodedSize);
+        *pdwLen = 0;
         return nullptr;
-    *pdwLen = decoded;
+    }
+    *pdwLen = decodedSize;
+    __android_log_print(ANDROID_LOG_INFO, "D1SaveBridge", "MPQ entry '%s' decoded: %zu -> %zu bytes", pszName, encodedSize, decodedSize);
     return data;
 }
 

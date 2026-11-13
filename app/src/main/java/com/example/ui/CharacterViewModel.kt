@@ -34,6 +34,7 @@ class CharacterViewModel : ViewModel() {
     private val _character = MutableStateFlow(HeroCharacter.createGodly(HeroClass.WARRIOR, "Aidan"))
     private var importedOriginalSave: ByteArray? = null
     private var importedRawHero: ByteArray? = null
+    private var lastNativeReadError: String? = null
     val character: StateFlow<HeroCharacter> = _character.asStateFlow()
 
     private val _activeTab = MutableStateFlow(EditorTab.HERO)
@@ -430,7 +431,7 @@ class CharacterViewModel : ViewModel() {
                 showMessage("Successfully imported $filename")
                 true
             } else {
-                showMessage("Import failed: No hero data found")
+                showMessage("Import failed: ${lastNativeReadError ?: "No hero data found"}")
                 false
             }
         } catch (e: Exception) {
@@ -450,16 +451,17 @@ class CharacterViewModel : ViewModel() {
         return try {
             NativeSaveBridge.readHero(path, multiplayer, spawn, hellfire, hellfire)
         } catch (e: Exception) {
-            Log.w("D1SaveBridge", "readHero failed (multi=$multiplayer hf=$hellfire): ${e.message}")
+            lastNativeReadError = e.message ?: e.javaClass.simpleName
+            Log.w("D1SaveBridge", "readHero failed (multi=$multiplayer hf=$hellfire): $lastNativeReadError", e)
             null
         }
     }
     private fun parseNativePlayerPack(raw: ByteArray): HeroCharacter {
         val buffer = ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN)
         
-        if (raw.size < 512) { // Minimal expected PlayerPack size
-            Log.e("D1SaveBridge", "Hero payload too small: ${raw.size} bytes")
-            return _character.value
+        // Keep in sync with sizeof(PlayerPack) in native pack.h.
+        if (raw.size < 1266) {
+            throw IllegalArgumentException("Hero payload too small: ${raw.size} bytes; expected at least 1266.")
         }
 
         // pName starts at 0x10 (32 bytes)
@@ -504,7 +506,7 @@ class CharacterViewModel : ViewModel() {
 
         // Helper to parse ItemPack from buffer
         fun parseItem(offset: Int): DiabloItem? {
-            if (offset + 20 > raw.size) return null
+            if (offset + 19 > raw.size) return null
             val iSeed = buffer.getInt(offset)
             if (iSeed == 0) return null // Empty slot
             val idx = buffer.getShort(offset + 6).toInt() and 0xFFFF
@@ -524,15 +526,15 @@ class CharacterViewModel : ViewModel() {
             EquipSlot.LEFT_HAND, EquipSlot.RIGHT_HAND, 
             EquipSlot.LEFT_RING, EquipSlot.RIGHT_RING
         )
-        // InvBody is at 0x90 in PlayerPack
+        // pack.h: sizeof(ItemPack)=19, InvBody offset=0x7C.
         for (i in slots.indices) {
-            parseItem(0x90 + i * 20)?.let { equipment[slots[i]] = it }
+            parseItem(0x7C + i * 19)?.let { equipment[slots[i]] = it }
         }
 
         val inventory = mutableListOf<DiabloItem>()
-        // InvList is at 0x90 + 7 * 20 = 0x11C
+        // pack.h: InvList offset=0x101 (0x7C + 7 * 19).
         for (i in 0 until 40) {
-            parseItem(0x11C + i * 20)?.let { inventory.add(it) }
+            parseItem(0x101 + i * 19)?.let { inventory.add(it) }
         }
 
         return _character.value.copy(
