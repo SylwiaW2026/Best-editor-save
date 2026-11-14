@@ -111,33 +111,53 @@ data class HeroCharacter(
             )
         }
 
+        /** Resolve a preset item by its display name without allowing a catalog change to crash startup. */
+        private fun godlyItem(
+            nameFragment: String,
+            fallbackBaseType: String,
+            slot: EquipSlot? = null
+        ): DiabloItem {
+            val item = ItemArmory.LEGENDARY_CATALOG.firstOrNull {
+                it.name.contains(nameFragment, ignoreCase = true)
+            } ?: ItemArmory.FULL_ITEM_LIBRARY.firstOrNull {
+                it.name.contains(nameFragment, ignoreCase = true)
+            }
+
+            return item ?: DiabloItem(
+                name = "Fallback $nameFragment",
+                baseType = fallbackBaseType,
+                quality = ItemQuality.UNIQUE,
+                defaultSlot = slot
+            )
+        }
+
         fun createGodly(heroClass: HeroClass, name: String = "Archon"): HeroCharacter {
             val allSpellsMax = DiabloSpellsCatalog.ALL_SPELLS.associate { it.id to 15 }
             val godlyItems = when (heroClass) {
                 HeroClass.WARRIOR -> mapOf(
-                    EquipSlot.HEAD to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Royal Crest") },
-                    EquipSlot.TORSO to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Godly Plate") },
-                    EquipSlot.LEFT_HAND to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Grandfather") },
-                    EquipSlot.RIGHT_HAND to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Stormshield") },
-                    EquipSlot.NECK to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Amulet") },
-                    EquipSlot.LEFT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Ring") },
-                    EquipSlot.RIGHT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Dragon's Ring") }
+                    EquipSlot.HEAD to godlyItem("Royal Crest", "Crown", EquipSlot.HEAD),
+                    EquipSlot.TORSO to godlyItem("Godly Plate", "Full Plate Mail", EquipSlot.TORSO),
+                    EquipSlot.LEFT_HAND to godlyItem("Grandfather", "Great Sword", EquipSlot.LEFT_HAND),
+                    EquipSlot.RIGHT_HAND to godlyItem("Stormshield", "Gothic Shield", EquipSlot.RIGHT_HAND),
+                    EquipSlot.NECK to godlyItem("Obsidian Amulet", "Amulet", EquipSlot.NECK),
+                    EquipSlot.LEFT_RING to godlyItem("Obsidian Ring", "Ring", EquipSlot.LEFT_RING),
+                    EquipSlot.RIGHT_RING to godlyItem("Dragon's Ring", "Ring", EquipSlot.RIGHT_RING)
                 )
                 HeroClass.ROGUE -> mapOf(
-                    EquipSlot.HEAD to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Veil of Steel") },
-                    EquipSlot.TORSO to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Demonspike") },
-                    EquipSlot.LEFT_HAND to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Windforce") },
-                    EquipSlot.NECK to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Amulet") },
-                    EquipSlot.LEFT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Ring") },
-                    EquipSlot.RIGHT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Ring") }
+                    EquipSlot.HEAD to godlyItem("Veil of Steel", "Great Helm", EquipSlot.HEAD),
+                    EquipSlot.TORSO to godlyItem("Demonspike", "Full Plate Mail", EquipSlot.TORSO),
+                    EquipSlot.LEFT_HAND to godlyItem("Windforce", "Long War Bow", EquipSlot.LEFT_HAND),
+                    EquipSlot.NECK to godlyItem("Obsidian Amulet", "Amulet", EquipSlot.NECK),
+                    EquipSlot.LEFT_RING to godlyItem("Obsidian Ring", "Ring", EquipSlot.LEFT_RING),
+                    EquipSlot.RIGHT_RING to godlyItem("Obsidian Ring", "Ring", EquipSlot.RIGHT_RING)
                 )
                 HeroClass.SORCERER -> mapOf(
-                    EquipSlot.HEAD to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Thinking Cap") },
-                    EquipSlot.TORSO to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Naj's Light Plate") },
-                    EquipSlot.LEFT_HAND to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Arch-Angel's") },
-                    EquipSlot.NECK to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Amulet") },
-                    EquipSlot.LEFT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Dragon's Ring") },
-                    EquipSlot.RIGHT_RING to ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Obsidian Ring") }
+                    EquipSlot.HEAD to godlyItem("Thinking Cap", "Skull Cap", EquipSlot.HEAD),
+                    EquipSlot.TORSO to godlyItem("Naj's Light Plate", "Light Plate", EquipSlot.TORSO),
+                    EquipSlot.LEFT_HAND to godlyItem("Arch-Angel's", "War Staff", EquipSlot.LEFT_HAND),
+                    EquipSlot.NECK to godlyItem("Obsidian Amulet", "Amulet", EquipSlot.NECK),
+                    EquipSlot.LEFT_RING to godlyItem("Dragon's Ring", "Ring", EquipSlot.LEFT_RING),
+                    EquipSlot.RIGHT_RING to godlyItem("Obsidian Ring", "Ring", EquipSlot.RIGHT_RING)
                 )
                 else -> emptyMap()
             }
@@ -169,9 +189,9 @@ data class HeroCharacter(
                 spellLevels = allSpellsMax,
                 equipment = godlyItems,
                 inventory = listOf(
-                    ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("King's Sword") },
-                    ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Naj's Puzzler") },
-                    ItemArmory.LEGENDARY_CATALOG.first { it.name.contains("Full Rejuvenation") }
+                    godlyItem("King's Sword", "Bastard Sword", EquipSlot.LEFT_HAND),
+                    godlyItem("Naj's Puzzler", "Long Staff", EquipSlot.LEFT_HAND),
+                    godlyItem("Full Rejuvenation", "Potion")
                 ),
                 questsCompleted = 16
             )
