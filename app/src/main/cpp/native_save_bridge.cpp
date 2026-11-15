@@ -8,6 +8,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
 
 #include "codec.h"
 #include "pack.h"
@@ -279,8 +280,15 @@ Java_com_example_data_parser_NativeSaveBridge_writeHero(
         codec_encode(encoded.get(), static_cast<size_t>(size), encodedSize, pfile_get_password());
         {
             MpqWriter writer(path.get());
-            if (!writer.WriteFile("hero", encoded.get(), encodedSize))
-                throw std::runtime_error("MPQ writer could not replace the 'hero' entry.");
+            if (!writer.WriteFile("hero", encoded.get(), encodedSize)) {
+                ThrowJava(env, "java/io/IOException", "MPQ writer could not replace the 'hero' entry.");
+                return;
+            }
+        }
+        struct stat st;
+        if (stat(path.get(), &st) != 0 || st.st_size < 10000) {
+            ThrowJava(env, "java/io/IOException", "MPQ file invalid or too small after write.");
+            return;
         }
         int32_t error = 0;
         auto verifyArchive = MpqArchive::Open(path.get(), error);
