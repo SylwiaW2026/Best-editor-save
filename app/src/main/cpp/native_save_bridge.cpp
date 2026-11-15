@@ -114,6 +114,10 @@ Java_com_example_data_parser_NativeSaveBridge_readHero(
         auto payload = ReadArchive(*archive, "hero", &size);
         if (!payload)
             throw std::runtime_error("Could not extract or decode MPQ entry 'hero'.");
+        if (size > MIN_SAVE_SIZE) {
+            LogInfo("readHero: Slicing payload to PlayerPack size (" + std::to_string(size) + " -> " + std::to_string(MIN_SAVE_SIZE) + ")");
+            size = MIN_SAVE_SIZE;
+        }
         if (size < MIN_SAVE_SIZE)
             throw std::runtime_error("Decoded hero payload is smaller than PlayerPack (actual " +
                 std::to_string(size) + ", expected at least " + std::to_string(MIN_SAVE_SIZE) + " bytes).");
