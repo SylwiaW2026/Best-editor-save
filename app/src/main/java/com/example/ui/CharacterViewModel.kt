@@ -502,9 +502,9 @@ class CharacterViewModel : ViewModel() {
         val gold = buffer.getInt(59).toLong() and 0xFFFFFFFFL
 
         // pHPBase = 63 (4 bytes)
-        val rawHpBase = buffer.getInt(63)
+        val rawHpBase = buffer.getInt(63) / 64
         // pMaxHPBase = 67 (4 bytes)
-        val rawMaxHp = buffer.getInt(67)
+        val rawMaxHp = buffer.getInt(67) / 64
         // pSplLvl starts at 0x4F (79)
         val spellLevels = mutableMapOf<String, Int>()
         val binaryToId = mapOf(
@@ -576,9 +576,9 @@ class CharacterViewModel : ViewModel() {
             life = rawHpBase,
             maxLife = rawMaxHp,
             baseLife = rawMaxHp,
-            mana = buffer.getInt(71),
-            maxMana = buffer.getInt(75),
-            baseMana = buffer.getInt(75),
+            mana = buffer.getInt(71) / 64,
+            maxMana = buffer.getInt(75) / 64,
+            baseMana = buffer.getInt(75) / 64,
             spellLevels = spellLevels,
             equipment = equipment,
             inventory = inventory
